@@ -1,3 +1,11 @@
+export type ActionItemType = 
+  | "Review" 
+  | "Pending Invite" 
+  | "Pending Rejection"
+  | "Response Pending" 
+  | "Duplicate" 
+  | "Invite Failed";
+
 export interface CandidateSnapshot {
   estimatedSeniority: string;
   yearsOfExperience: number;
@@ -29,7 +37,7 @@ export interface ActionItem {
   id: string;
   candidateId: string;
   candidateName: string;
-  type: "Review" | "Response Pending" | "Duplicate" | "Invite Failed";
+  type: ActionItemType;
   description: string;
   priority: "High" | "Medium" | "Low";
   createdAt: Date;

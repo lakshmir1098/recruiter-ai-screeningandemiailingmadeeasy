@@ -41,20 +41,40 @@ export const CandidateProvider = ({ children }: { children: ReactNode }) => {
       screeningResult: result,
     });
 
-    // Create action item for Medium fits
-    if (result.fitCategory === "Medium") {
-      const candidate = candidates.find((c) => c.id === candidateId);
-      if (candidate) {
-        addActionItem({
-          id: crypto.randomUUID(),
-          candidateId,
-          candidateName: candidate.name,
-          type: "Review",
-          description: `Medium fit candidate requires manual review. Score: ${result.fitScore}/100`,
-          priority: "Medium",
-          createdAt: new Date(),
-        });
-      }
+    const candidate = candidates.find((c) => c.id === candidateId);
+    if (!candidate) return;
+
+    // Create action items based on recommendation
+    if (result.recommendedAction === "Interview") {
+      addActionItem({
+        id: crypto.randomUUID(),
+        candidateId,
+        candidateName: candidate.name,
+        type: "Pending Invite",
+        description: `Strong fit - ready to send interview invite. Score: ${result.fitScore}/100`,
+        priority: "High",
+        createdAt: new Date(),
+      });
+    } else if (result.fitCategory === "Medium") {
+      addActionItem({
+        id: crypto.randomUUID(),
+        candidateId,
+        candidateName: candidate.name,
+        type: "Review",
+        description: `Medium fit candidate requires manual review. Score: ${result.fitScore}/100`,
+        priority: "Medium",
+        createdAt: new Date(),
+      });
+    } else if (result.recommendedAction === "Reject") {
+      addActionItem({
+        id: crypto.randomUUID(),
+        candidateId,
+        candidateName: candidate.name,
+        type: "Pending Rejection",
+        description: `Low fit - confirm rejection. Score: ${result.fitScore}/100`,
+        priority: "Low",
+        createdAt: new Date(),
+      });
     }
   };
 

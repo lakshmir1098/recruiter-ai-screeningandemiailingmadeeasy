@@ -54,7 +54,7 @@ export const AppNavigation = () => {
         <div className="flex items-center gap-4">
           {user && (
             <span className="hidden md:inline text-sm text-muted-foreground">
-              {user.name}
+              {user.email}
             </span>
           )}
           <Button variant="ghost" size="sm" onClick={logout} className="gap-2">
