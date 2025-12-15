@@ -26,25 +26,27 @@ import {
   XCircle,
   TrendingUp,
   Clock,
-  CheckCircle
+  CheckCircle,
+  Loader2
 } from "lucide-react";
 import { AppNavigation } from "@/components/AppNavigation";
-import { useCandidates } from "@/context/CandidateContext";
 import { toast } from "sonner";
-import { sendInvite, sendRejection } from "@/services/recruitApi";
+import { useCandidatesDb, DbCandidate } from "@/hooks/useCandidatesDb";
+import { needsManualAction } from "@/services/recruitApi";
 
 const Candidates = () => {
-  const { candidates, updateCandidate } = useCandidates();
+  const { candidates, loading, inviteCandidate, rejectCandidate } = useCandidatesDb();
   const [searchQuery, setSearchQuery] = useState("");
   const [fitFilter, setFitFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   const filteredCandidates = candidates.filter((candidate) => {
     const matchesSearch = candidate.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      candidate.jobTitle.toLowerCase().includes(searchQuery.toLowerCase());
+      candidate.job_title.toLowerCase().includes(searchQuery.toLowerCase());
     
     const matchesFit = fitFilter === "all" || 
-      candidate.screeningResult?.fitCategory === fitFilter;
+      candidate.fit_category === fitFilter;
     
     const matchesStatus = statusFilter === "all" || candidate.status === statusFilter;
     
@@ -52,54 +54,36 @@ const Candidates = () => {
   });
 
   const stats = {
-    strong: candidates.filter((c) => c.screeningResult?.fitCategory === "Strong").length,
-    medium: candidates.filter((c) => c.screeningResult?.fitCategory === "Medium").length,
-    inProgress: candidates.filter((c) => c.status === "Pending").length,
+    strong: candidates.filter((c) => c.fit_category === "Strong").length,
+    medium: candidates.filter((c) => c.fit_category === "Medium").length,
+    inProgress: candidates.filter((c) => c.status === "Pending" || c.status === "Screened").length,
   };
 
   const handleInvite = async (candidateId: string) => {
-    const candidate = candidates.find(c => c.id === candidateId);
-    if (!candidate) return;
-    
+    setActionLoading(candidateId);
     try {
-      await sendInvite({
-        candidate: {
-          email: candidate.email,
-          name: candidate.name,
-        },
-        jobTitle: candidate.jobTitle,
-        companyName: "Your Company",
-      });
-      updateCandidate(candidateId, { status: "Invited" });
-      toast.success("Interview invite sent!");
+      await inviteCandidate(candidateId);
     } catch (error) {
       console.error("Invite error:", error);
       toast.error("Failed to send invite");
+    } finally {
+      setActionLoading(null);
     }
   };
 
   const handleReject = async (candidateId: string) => {
-    const candidate = candidates.find(c => c.id === candidateId);
-    if (!candidate) return;
-    
+    setActionLoading(candidateId);
     try {
-      await sendRejection({
-        candidate: {
-          email: candidate.email,
-          name: candidate.name,
-        },
-        jobTitle: candidate.jobTitle,
-        companyName: "Your Company",
-      });
-      updateCandidate(candidateId, { status: "Rejected" });
-      toast.info("Candidate rejected");
+      await rejectCandidate(candidateId);
     } catch (error) {
       console.error("Reject error:", error);
-      toast.error("Failed to send rejection");
+      toast.error("Failed to reject candidate");
+    } finally {
+      setActionLoading(null);
     }
   };
 
-  const getFitBadge = (fitCategory?: string) => {
+  const getFitBadge = (fitCategory?: string | null) => {
     switch (fitCategory) {
       case "Strong":
         return <Badge className="bg-success/10 text-success border-success/20">Strong</Badge>;
@@ -123,6 +107,13 @@ const Candidates = () => {
       default:
         return <Badge variant="outline">Pending</Badge>;
     }
+  };
+
+  const showActionButtons = (candidate: DbCandidate) => {
+    // Show buttons only for screened candidates with score 41-89
+    return candidate.status === "Screened" && 
+           candidate.fit_score !== null && 
+           needsManualAction(candidate.fit_score);
   };
 
   return (
@@ -258,35 +249,41 @@ const Candidates = () => {
                           <p className="text-sm text-muted-foreground">{candidate.email}</p>
                         </div>
                       </TableCell>
-                      <TableCell>{candidate.jobTitle}</TableCell>
+                      <TableCell>{candidate.job_title}</TableCell>
                       <TableCell>
-                        {candidate.screeningResult ? (
+                        {candidate.fit_score !== null ? (
                           <span className="font-medium">
-                            {candidate.screeningResult.fitScore}/100
+                            {candidate.fit_score}/100
                           </span>
                         ) : (
                           "-"
                         )}
                       </TableCell>
-                      <TableCell>{getFitBadge(candidate.screeningResult?.fitCategory)}</TableCell>
+                      <TableCell>{getFitBadge(candidate.fit_category)}</TableCell>
                       <TableCell>{getStatusBadge(candidate.status)}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button variant="ghost" size="sm">
                             <Eye className="h-4 w-4" />
                           </Button>
-                          {candidate.status === "Screened" && (
+                          {showActionButtons(candidate) && (
                             <>
                               <Button 
                                 variant="ghost" 
                                 size="sm"
+                                disabled={actionLoading === candidate.id}
                                 onClick={() => handleInvite(candidate.id)}
                               >
-                                <Send className="h-4 w-4" />
+                                {actionLoading === candidate.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Send className="h-4 w-4" />
+                                )}
                               </Button>
                               <Button 
                                 variant="ghost" 
                                 size="sm"
+                                disabled={actionLoading === candidate.id}
                                 onClick={() => handleReject(candidate.id)}
                               >
                                 <XCircle className="h-4 w-4" />

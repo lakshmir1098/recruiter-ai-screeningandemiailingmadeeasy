@@ -18,11 +18,14 @@ import { useState } from "react";
 
 interface ScreeningOutputProps {
   result: ScreeningResult;
-  onSendInvite: () => Promise<void>;
+  showManualActions?: boolean;
+  onSendInvite?: () => Promise<void>;
+  onReject?: () => Promise<void>;
 }
 
-export const ScreeningOutput = ({ result, onSendInvite }: ScreeningOutputProps) => {
+export const ScreeningOutput = ({ result, showManualActions = false, onSendInvite, onReject }: ScreeningOutputProps) => {
   const [isSending, setIsSending] = useState(false);
+  const [isRejecting, setIsRejecting] = useState(false);
 
   const getActionIcon = () => {
     switch (result.recommendedAction) {
@@ -58,14 +61,26 @@ export const ScreeningOutput = ({ result, onSendInvite }: ScreeningOutputProps) 
   };
 
   const handleSendInvite = async () => {
+    if (!onSendInvite) return;
     setIsSending(true);
     try {
       await onSendInvite();
-      toast.success("Interview invite sent successfully!");
     } catch {
       toast.error("Failed to send invite. Please try again.");
     } finally {
       setIsSending(false);
+    }
+  };
+
+  const handleReject = async () => {
+    if (!onReject) return;
+    setIsRejecting(true);
+    try {
+      await onReject();
+    } catch {
+      toast.error("Failed to reject. Please try again.");
+    } finally {
+      setIsRejecting(false);
     }
   };
 
@@ -106,31 +121,33 @@ export const ScreeningOutput = ({ result, onSendInvite }: ScreeningOutputProps) 
         </CardContent>
       </Card>
 
-      {/* Candidate Snapshot */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <User className="h-4 w-4" />
-            Candidate Snapshot
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <div className="text-sm text-muted-foreground">Seniority</div>
-              <div className="font-medium">{result.candidateSnapshot.estimatedSeniority}</div>
+      {/* Candidate Snapshot - only show if data exists */}
+      {result.candidateSnapshot && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <User className="h-4 w-4" />
+              Candidate Snapshot
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <div className="text-sm text-muted-foreground">Seniority</div>
+                <div className="font-medium">{result.candidateSnapshot.estimatedSeniority}</div>
+              </div>
+              <div>
+                <div className="text-sm text-muted-foreground">Experience</div>
+                <div className="font-medium">{result.candidateSnapshot.yearsOfExperience} years</div>
+              </div>
+              <div>
+                <div className="text-sm text-muted-foreground">Last Role</div>
+                <div className="font-medium">{result.candidateSnapshot.lastRole}</div>
+              </div>
             </div>
-            <div>
-              <div className="text-sm text-muted-foreground">Experience</div>
-              <div className="font-medium">{result.candidateSnapshot.yearsOfExperience} years</div>
-            </div>
-            <div>
-              <div className="text-sm text-muted-foreground">Last Role</div>
-              <div className="font-medium">{result.candidateSnapshot.lastRole}</div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {/* AI Screening Summary */}
       <Card>
@@ -203,32 +220,41 @@ export const ScreeningOutput = ({ result, onSendInvite }: ScreeningOutputProps) 
       {/* Next Step Actions */}
       <Card>
         <CardContent className="py-4">
-          {result.recommendedAction === "Interview" && (
-            <Button 
-              onClick={handleSendInvite} 
-              disabled={isSending}
-              className="w-full gap-2"
-              size="lg"
-            >
-              <Send className="h-4 w-4" />
-              {isSending ? "Sending Invite..." : "Send Interview Invite"}
-            </Button>
-          )}
-          {result.recommendedAction === "Reject" && (
-            <Button 
-              onClick={handleCopyRejection}
-              variant="outline"
-              className="w-full gap-2"
-              size="lg"
-            >
-              <Copy className="h-4 w-4" />
-              Copy Rejection Message
-            </Button>
-          )}
-          {result.recommendedAction === "Review" && (
-            <div className="text-center text-muted-foreground">
-              This candidate requires manual review. Check Action Items for details.
+          {showManualActions ? (
+            <div className="flex gap-4">
+              <Button 
+                onClick={handleSendInvite} 
+                disabled={isSending || !onSendInvite}
+                className="flex-1 gap-2 bg-success hover:bg-success/90"
+                size="lg"
+              >
+                <Send className="h-4 w-4" />
+                {isSending ? "Sending..." : "Send Invite"}
+              </Button>
+              <Button 
+                onClick={handleReject} 
+                disabled={isRejecting || !onReject}
+                variant="destructive"
+                className="flex-1 gap-2"
+                size="lg"
+              >
+                <XCircle className="h-4 w-4" />
+                {isRejecting ? "Rejecting..." : "Reject"}
+              </Button>
             </div>
+          ) : (
+            <>
+              {result.fitScore >= 90 && (
+                <div className="text-center text-success font-medium">
+                  ✓ Candidate automatically invited (score ≥ 90)
+                </div>
+              )}
+              {result.fitScore <= 40 && (
+                <div className="text-center text-destructive font-medium">
+                  ✗ Candidate automatically rejected (score ≤ 40)
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>

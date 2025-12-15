@@ -95,3 +95,15 @@ export const sendRejection = async (request: CandidateActionRequest): Promise<vo
     throw new Error(`Rejection failed: ${response.statusText}`);
   }
 };
+
+// Determine status based on fit score
+export const getStatusFromScore = (score: number): "Invited" | "Screened" | "Rejected" => {
+  if (score >= 90) return "Invited";
+  if (score <= 40) return "Rejected";
+  return "Screened"; // 41-89: needs manual decision
+};
+
+// Check if candidate needs manual action (score 41-89)
+export const needsManualAction = (score: number): boolean => {
+  return score >= 41 && score <= 89;
+};
