@@ -14,7 +14,63 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      candidates: {
+        Row: {
+          created_at: string
+          email: string
+          fit_category: string | null
+          fit_score: number | null
+          gaps: string[] | null
+          id: string
+          job_description: string | null
+          job_title: string
+          name: string
+          recommended_action: string | null
+          resume_text: string | null
+          screening_summary: string | null
+          status: string
+          strengths: string[] | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          fit_category?: string | null
+          fit_score?: number | null
+          gaps?: string[] | null
+          id?: string
+          job_description?: string | null
+          job_title: string
+          name: string
+          recommended_action?: string | null
+          resume_text?: string | null
+          screening_summary?: string | null
+          status?: string
+          strengths?: string[] | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          fit_category?: string | null
+          fit_score?: number | null
+          gaps?: string[] | null
+          id?: string
+          job_description?: string | null
+          job_title?: string
+          name?: string
+          recommended_action?: string | null
+          resume_text?: string | null
+          screening_summary?: string | null
+          status?: string
+          strengths?: string[] | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

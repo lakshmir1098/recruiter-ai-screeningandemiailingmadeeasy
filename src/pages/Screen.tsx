@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { 
@@ -16,9 +18,9 @@ import { useDropzone } from "react-dropzone";
 import { AppNavigation } from "@/components/AppNavigation";
 import { ScreeningOutput } from "@/components/ScreeningOutput";
 import { ScreeningResult } from "@/types/candidate";
-import { useCandidates } from "@/context/CandidateContext";
 import { toast } from "sonner";
-import { screenCandidate as screenCandidateApi, sendInvite } from "@/services/recruitApi";
+import { useCandidatesDb } from "@/hooks/useCandidatesDb";
+import { needsManualAction } from "@/services/recruitApi";
 
 const exampleJobDescription = `Senior Frontend Developer
 
@@ -39,16 +41,22 @@ Nice to have:
 const Screen = () => {
   const [jobDescription, setJobDescription] = useState("");
   const [resumeText, setResumeText] = useState("");
+  const [candidateName, setCandidateName] = useState("");
+  const [candidateEmail, setCandidateEmail] = useState("");
+  const [jobTitle, setJobTitle] = useState("");
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState(0);
   const [screeningResult, setScreeningResult] = useState<ScreeningResult | null>(null);
-  
-  const { addCandidate, updateCandidate } = useCandidates();
+  const [showManualActions, setShowManualActions] = useState(false);
+  const [currentCandidateId, setCurrentCandidateId] = useState<string | null>(null);
+
+  const { screenAndSaveCandidate, inviteCandidate, rejectCandidate } = useCandidatesDb();
 
   const jdValidation = jobDescription.length >= 100;
   const resumeValidation = resumeText.length > 0 || resumeFile !== null;
-  const canAnalyze = jdValidation && resumeValidation && !isAnalyzing;
+  const candidateValidation = candidateName.length > 0 && candidateEmail.length > 0 && jobTitle.length > 0;
+  const canAnalyze = jdValidation && resumeValidation && candidateValidation && !isAnalyzing;
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: {
@@ -70,18 +78,21 @@ const Screen = () => {
     setIsAnalyzing(true);
     setAnalysisProgress(0);
     setScreeningResult(null);
+    setShowManualActions(false);
 
     const progressInterval = setInterval(() => {
       setAnalysisProgress((prev) => Math.min(prev + 15, 90));
     }, 400);
 
     try {
-      // Call n8n screening webhook with correct JSON format
-      const apiResult = await screenCandidateApi({
-        jd: jobDescription,
-        resume: resumeText || "Uploaded file content",
-      });
-      
+      const { candidate, requiresManualAction, screeningResult: apiResult } = await screenAndSaveCandidate(
+        candidateName,
+        candidateEmail,
+        jobTitle,
+        jobDescription,
+        resumeText || "Uploaded file content"
+      );
+
       clearInterval(progressInterval);
       setAnalysisProgress(100);
 
@@ -95,21 +106,16 @@ const Screen = () => {
       };
 
       setScreeningResult(result);
+      setCurrentCandidateId(candidate.id);
+      setShowManualActions(requiresManualAction);
 
-      // Add candidate to context
-      const candidateId = crypto.randomUUID();
-      addCandidate({
-        id: candidateId,
-        name: "Candidate",
-        email: "candidate@email.com",
-        resumeText: resumeText || "Uploaded file",
-        jobTitle: "Frontend Developer",
-        status: "Screened",
-        screeningResult: result,
-        createdAt: new Date(),
-      });
-
-      toast.success("Analysis complete!");
+      if (apiResult.fitScore >= 90) {
+        toast.success("Candidate automatically invited (score >= 90)!");
+      } else if (apiResult.fitScore <= 40) {
+        toast.info("Candidate automatically rejected (score <= 40)");
+      } else {
+        toast.success("Analysis complete! Manual action required.");
+      }
     } catch (error) {
       clearInterval(progressInterval);
       console.error("Screening error:", error);
@@ -119,29 +125,39 @@ const Screen = () => {
     }
   };
 
-  const handleSendInvite = async () => {
+  const handleManualInvite = async () => {
+    if (!currentCandidateId) return;
     try {
-      await sendInvite({
-        candidate: {
-          email: "candidate@email.com",
-          name: "Candidate",
-        },
-        jobTitle: "Frontend Developer",
-        companyName: "Your Company",
-      });
-      toast.success("Interview invite sent!");
+      await inviteCandidate(currentCandidateId);
+      setShowManualActions(false);
     } catch (error) {
       console.error("Invite error:", error);
-      toast.error("Failed to send invite.");
+      toast.error("Failed to send invite");
+    }
+  };
+
+  const handleManualReject = async () => {
+    if (!currentCandidateId) return;
+    try {
+      await rejectCandidate(currentCandidateId);
+      setShowManualActions(false);
+    } catch (error) {
+      console.error("Reject error:", error);
+      toast.error("Failed to reject candidate");
     }
   };
 
   const handleReset = () => {
     setJobDescription("");
     setResumeText("");
+    setCandidateName("");
+    setCandidateEmail("");
+    setJobTitle("");
     setResumeFile(null);
     setScreeningResult(null);
     setAnalysisProgress(0);
+    setShowManualActions(false);
+    setCurrentCandidateId(null);
   };
 
   return (
@@ -158,6 +174,45 @@ const Screen = () => {
 
         {!screeningResult ? (
           <>
+            {/* Candidate Info */}
+            <Card className="mb-6">
+              <CardHeader>
+                <CardTitle className="text-lg">Candidate Information</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="candidateName">Name *</Label>
+                    <Input
+                      id="candidateName"
+                      placeholder="John Doe"
+                      value={candidateName}
+                      onChange={(e) => setCandidateName(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="candidateEmail">Email *</Label>
+                    <Input
+                      id="candidateEmail"
+                      type="email"
+                      placeholder="john@example.com"
+                      value={candidateEmail}
+                      onChange={(e) => setCandidateEmail(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="jobTitle">Job Title *</Label>
+                    <Input
+                      id="jobTitle"
+                      placeholder="Frontend Developer"
+                      value={jobTitle}
+                      onChange={(e) => setJobTitle(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
             <div className="grid lg:grid-cols-2 gap-6 mb-6">
               {/* Job Description Input */}
               <Card>
@@ -297,7 +352,12 @@ const Screen = () => {
                 Screen Another Candidate
               </Button>
             </div>
-            <ScreeningOutput result={screeningResult} onSendInvite={handleSendInvite} />
+            <ScreeningOutput 
+              result={screeningResult} 
+              showManualActions={showManualActions}
+              onSendInvite={handleManualInvite}
+              onReject={handleManualReject}
+            />
           </>
         )}
       </main>
