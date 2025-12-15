@@ -19,7 +19,7 @@ export interface ScreeningResult {
   recommendedAction: "Interview" | "Review" | "Reject";
   strengths: string[];
   gaps: string[];
-  candidateSnapshot: CandidateSnapshot;
+  candidateSnapshot?: CandidateSnapshot;
 }
 
 export interface Candidate {

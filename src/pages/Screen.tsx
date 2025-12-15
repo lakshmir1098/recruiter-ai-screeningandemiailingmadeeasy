@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { 
@@ -19,6 +18,7 @@ import { ScreeningOutput } from "@/components/ScreeningOutput";
 import { ScreeningResult } from "@/types/candidate";
 import { useCandidates } from "@/context/CandidateContext";
 import { toast } from "sonner";
+import { screenCandidate as screenCandidateApi, sendInvite } from "@/services/recruitApi";
 
 const exampleJobDescription = `Senior Frontend Developer
 
@@ -71,31 +71,27 @@ const Screen = () => {
     setAnalysisProgress(0);
     setScreeningResult(null);
 
-    // Simulate API call with progress
     const progressInterval = setInterval(() => {
       setAnalysisProgress((prev) => Math.min(prev + 15, 90));
     }, 400);
 
     try {
-      // Simulated API response (in production, this would call POST /api/recruitai/screen)
-      await new Promise((resolve) => setTimeout(resolve, 2500));
+      // Call n8n screening webhook with correct JSON format
+      const apiResult = await screenCandidateApi({
+        jd: jobDescription,
+        resume: resumeText || "Uploaded file content",
+      });
       
       clearInterval(progressInterval);
       setAnalysisProgress(100);
 
-      // Mock screening result
       const result: ScreeningResult = {
-        fitScore: 82,
-        fitCategory: "Strong",
-        screeningSummary: "Candidate demonstrates strong alignment with frontend requirements, particularly in React and TypeScript, with relevant production experience. Shows solid understanding of modern development practices and has led multiple successful projects.",
-        recommendedAction: "Interview",
-        strengths: ["React & TypeScript expertise", "5+ years experience", "Strong communication skills", "Team leadership experience"],
-        gaps: ["Limited Next.js experience", "No CI/CD pipeline ownership"],
-        candidateSnapshot: {
-          estimatedSeniority: "Senior",
-          yearsOfExperience: 6,
-          lastRole: "Senior Frontend Developer",
-        },
+        fitScore: apiResult.fitScore,
+        fitCategory: apiResult.fitCategory,
+        screeningSummary: apiResult.screeningSummary,
+        recommendedAction: apiResult.recommendedAction,
+        strengths: apiResult.strengths,
+        gaps: apiResult.gaps,
       };
 
       setScreeningResult(result);
@@ -114,7 +110,9 @@ const Screen = () => {
       });
 
       toast.success("Analysis complete!");
-    } catch {
+    } catch (error) {
+      clearInterval(progressInterval);
+      console.error("Screening error:", error);
       toast.error("Analysis failed. Please try again.");
     } finally {
       setIsAnalyzing(false);
@@ -122,8 +120,20 @@ const Screen = () => {
   };
 
   const handleSendInvite = async () => {
-    // Simulated API call to POST /api/recruitai/invite
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    try {
+      await sendInvite({
+        candidate: {
+          email: "candidate@email.com",
+          name: "Candidate",
+        },
+        jobTitle: "Frontend Developer",
+        companyName: "Your Company",
+      });
+      toast.success("Interview invite sent!");
+    } catch (error) {
+      console.error("Invite error:", error);
+      toast.error("Failed to send invite.");
+    }
   };
 
   const handleReset = () => {

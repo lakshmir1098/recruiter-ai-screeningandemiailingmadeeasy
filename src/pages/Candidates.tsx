@@ -31,6 +31,7 @@ import {
 import { AppNavigation } from "@/components/AppNavigation";
 import { useCandidates } from "@/context/CandidateContext";
 import { toast } from "sonner";
+import { sendInvite, sendRejection } from "@/services/recruitApi";
 
 const Candidates = () => {
   const { candidates, updateCandidate } = useCandidates();
@@ -57,14 +58,45 @@ const Candidates = () => {
   };
 
   const handleInvite = async (candidateId: string) => {
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    updateCandidate(candidateId, { status: "Invited" });
-    toast.success("Interview invite sent!");
+    const candidate = candidates.find(c => c.id === candidateId);
+    if (!candidate) return;
+    
+    try {
+      await sendInvite({
+        candidate: {
+          email: candidate.email,
+          name: candidate.name,
+        },
+        jobTitle: candidate.jobTitle,
+        companyName: "Your Company",
+      });
+      updateCandidate(candidateId, { status: "Invited" });
+      toast.success("Interview invite sent!");
+    } catch (error) {
+      console.error("Invite error:", error);
+      toast.error("Failed to send invite");
+    }
   };
 
-  const handleReject = (candidateId: string) => {
-    updateCandidate(candidateId, { status: "Rejected" });
-    toast.info("Candidate rejected");
+  const handleReject = async (candidateId: string) => {
+    const candidate = candidates.find(c => c.id === candidateId);
+    if (!candidate) return;
+    
+    try {
+      await sendRejection({
+        candidate: {
+          email: candidate.email,
+          name: candidate.name,
+        },
+        jobTitle: candidate.jobTitle,
+        companyName: "Your Company",
+      });
+      updateCandidate(candidateId, { status: "Rejected" });
+      toast.info("Candidate rejected");
+    } catch (error) {
+      console.error("Reject error:", error);
+      toast.error("Failed to send rejection");
+    }
   };
 
   const getFitBadge = (fitCategory?: string) => {

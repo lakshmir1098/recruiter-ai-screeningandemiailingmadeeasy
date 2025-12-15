@@ -16,6 +16,7 @@ import { useCandidates } from "@/context/CandidateContext";
 import { format } from "date-fns";
 import { ActionItemType } from "@/types/candidate";
 import { toast } from "sonner";
+import { sendInvite, sendRejection } from "@/services/recruitApi";
 
 const ActionItems = () => {
   const { actionItems, removeActionItem, candidates, updateCandidate } = useCandidates();
@@ -52,16 +53,48 @@ const ActionItems = () => {
     }
   };
 
-  const handleSendInvite = (itemId: string, candidateId: string) => {
-    updateCandidate(candidateId, { status: "Invited" });
-    removeActionItem(itemId);
-    toast.success("Interview invite sent successfully!");
+  const handleSendInvite = async (itemId: string, candidateId: string) => {
+    const candidate = candidates.find(c => c.id === candidateId);
+    if (!candidate) return;
+    
+    try {
+      await sendInvite({
+        candidate: {
+          email: candidate.email,
+          name: candidate.name,
+        },
+        jobTitle: candidate.jobTitle,
+        companyName: "Your Company",
+      });
+      updateCandidate(candidateId, { status: "Invited" });
+      removeActionItem(itemId);
+      toast.success("Interview invite sent successfully!");
+    } catch (error) {
+      console.error("Invite error:", error);
+      toast.error("Failed to send invite");
+    }
   };
 
-  const handleReject = (itemId: string, candidateId: string) => {
-    updateCandidate(candidateId, { status: "Rejected" });
-    removeActionItem(itemId);
-    toast.success("Candidate rejected");
+  const handleReject = async (itemId: string, candidateId: string) => {
+    const candidate = candidates.find(c => c.id === candidateId);
+    if (!candidate) return;
+    
+    try {
+      await sendRejection({
+        candidate: {
+          email: candidate.email,
+          name: candidate.name,
+        },
+        jobTitle: candidate.jobTitle,
+        companyName: "Your Company",
+      });
+      updateCandidate(candidateId, { status: "Rejected" });
+      removeActionItem(itemId);
+      toast.success("Candidate rejected");
+    } catch (error) {
+      console.error("Reject error:", error);
+      toast.error("Failed to send rejection");
+    }
   };
 
   const handleResolve = (itemId: string) => {
