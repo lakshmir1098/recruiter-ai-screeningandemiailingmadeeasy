@@ -1,19 +1,15 @@
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Brain, FileSearch, Users, Bell, Settings, LogOut } from "lucide-react";
+import { Brain, FileSearch, Users, Settings, LogOut } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { useCandidates } from "@/context/CandidateContext";
 
 export const AppNavigation = () => {
   const location = useLocation();
   const { logout, user } = useAuth();
-  const { actionItems } = useCandidates();
 
   const navItems = [
     { path: "/screen", label: "Screening", icon: FileSearch },
     { path: "/candidates", label: "Candidates", icon: Users },
-    { path: "/action-items", label: "Action Items", icon: Bell, badge: actionItems.length },
     { path: "/settings", label: "Settings", icon: Settings },
   ];
 
@@ -40,11 +36,6 @@ export const AppNavigation = () => {
                 >
                   <item.icon className="h-4 w-4" />
                   {item.label}
-                  {item.badge && item.badge > 0 && (
-                    <Badge variant="destructive" className="ml-1 h-5 min-w-5 px-1 text-xs">
-                      {item.badge}
-                    </Badge>
-                  )}
                 </Button>
               </Link>
             ))}
